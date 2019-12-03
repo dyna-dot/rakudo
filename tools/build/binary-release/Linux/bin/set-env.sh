@@ -21,7 +21,7 @@ rreadlink() (
   if [ "$fname" = '.' ]; then
     command printf '%s\n' "${targetDir%/}"
   elif  [ "$fname" = '..' ]; then
-    command printf '%s\n' "$(command dirname -- "${targetDir}")"
+    command printf '%s\n' "$(command dirname -- "$targetDir")"
   else
     command printf '%s\n' "${targetDir%/}/$fname"
   fi
@@ -30,5 +30,5 @@ rreadlink() (
 EXEC=$(rreadlink "$0")
 DIR=$(dirname -- "$EXEC")
 
-echo export PATH=$DIR:$DIR/../share/perl6/site/bin:$PATH
+echo export PATH="$DIR:$DIR/../share/perl6/site/bin:$PATH"
 
