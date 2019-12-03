@@ -4,13 +4,9 @@ module.exports.load = function(nqp, CodeRef, Capture, containerSpecs) {
 
   let Scalar, True, False, Str, Code, Mu, Signature;
 
-  nqp.saveThisGlobalContext(context => {
-    context.p6binder = nqp.p6binder;
-  });
+  nqp.saveThisGlobalContext(context => { context.p6binder = nqp.p6binder; });
 
-  nqp.restoreThisGlobalContext(context => {
-    nqp.p6binder = context.p6binder;
-  });
+  nqp.restoreThisGlobalContext(context => { nqp.p6binder = context.p6binder; });
 
   op.p6settypes = function(types) {
     nqp.restoreThisGlobalContext(context => {
@@ -26,13 +22,10 @@ module.exports.load = function(nqp, CodeRef, Capture, containerSpecs) {
     return types;
   };
 
-  op.p6bool = function(value) {
-    return value ? True : False;
-  };
+  op.p6bool = function(value) { return value ? True : False; };
 
-  op.p6definite = function(obj) {
-    return (obj === Null || obj.$$typeObject) ? False : True;
-  };
+  op.p6definite = function(
+      obj) { return (obj === Null || obj.$$typeObject) ? False : True; };
 
   op.p6typecheckrv = /*async*/ function(ctx, rv, routine, bypassType) {
     const sig = routine.$$getattr(Code, '$!signature');
@@ -41,7 +34,8 @@ module.exports.load = function(nqp, CodeRef, Capture, containerSpecs) {
       let targetType;
       const how = rtype.$$STable.HOW;
       const archetypes = /*await*/ how.p6$archetypes(ctx, null, how);
-      const isCoercive = nqp.retval_bool(ctx, /*await*/ archetypes.p6$coercive(ctx, null, archetypes));
+      const isCoercive = nqp.retval_bool(
+          ctx, /*await*/ archetypes.p6$coercive(ctx, null, archetypes));
 
       if (isCoercive) {
         targetType = /*await*/ how.p6$target_type(ctx, null, how, rtype);
@@ -49,25 +43,30 @@ module.exports.load = function(nqp, CodeRef, Capture, containerSpecs) {
       }
 
       const decontValue = /*await*/ rv.$$decont(ctx);
-      if (/*await*/ decontValue.$$istype(ctx, rtype) === 0 && /*await*/ decontValue.$$istype(ctx, bypassType) === 0) {
+      if (/*await*/ decontValue.$$istype(ctx, rtype) === 0 &&
+          /*await*/ decontValue.$$istype(ctx, bypassType) === 0) {
         const thrower = getThrower("X::TypeCheck::Return");
         if (thrower === Null) {
-            /*await*/ ctx.die("Type check failed for return value");
+          /*await*/ ctx.die("Type check failed for return value");
         } else {
-            /*await*/ thrower.$$call(ctx, null, decontValue, rtype);
+          /*await*/ thrower.$$call(ctx, null, decontValue, rtype);
         }
       }
 
       if (targetType !== undefined && targetType !== rtype) {
-        const targetTypeName = /*await*/ targetType.$$STable.HOW.p6$name(
-          ctx, null, targetType.$$STable.HOW, targetType).$$getStr();
+        const targetTypeName =
+            /*await*/ targetType.$$STable.HOW
+                .p6$name(ctx, null, targetType.$$STable.HOW, targetType)
+                .$$getStr();
         if (/*await*/ rv.$$can(ctx, targetTypeName)) {
           return rv['p6$' + targetTypeName](ctx, null, rv);
         } else {
-          const rtypeName = /*await*/ rtype.$$STable.HOW.p6$name(ctx, null, rtype.$$STable.HOW, rtype).$$getStr();
-          throw new nqp.NQPException(
-            `Unable to coerce the return value from ${rtypeName} to ${targetTypeName} ;` +
-              `no coercion method defined`);
+          const rtypeName = /*await*/ rtype.$$STable.HOW
+                                .p6$name(ctx, null, rtype.$$STable.HOW, rtype)
+                                .$$getStr();
+          throw new nqp.NQPException(`Unable to coerce the return value from ${
+                                         rtypeName} to ${targetTypeName} ;` +
+                                     `no coercion method defined`);
         }
       }
     }
@@ -121,16 +120,16 @@ module.exports.load = function(nqp, CodeRef, Capture, containerSpecs) {
     const elems = capList.$$elems();
 
     for (let i = 0; i < elems; i++) {
-        const codeObj = capList.$$atpos(i);
+      const codeObj = capList.$$atpos(i);
 
-        const closure = codeObj.$$getattr(Code, "$!do");
+      const closure = codeObj.$$getattr(Code, "$!do");
 
-        const ctxToDiddle = closure.outerCtx;
-        if (ctxToDiddle) {
-          ctxToDiddle.$$outer = cf;
-        } else {
-          console.log("can't diddle", closure);
-        }
+      const ctxToDiddle = closure.outerCtx;
+      if (ctxToDiddle) {
+        ctxToDiddle.$$outer = cf;
+      } else {
+        console.log("can't diddle", closure);
+      }
     }
 
     return capList;
@@ -143,13 +142,14 @@ module.exports.load = function(nqp, CodeRef, Capture, containerSpecs) {
     if (ctx.codeRef().staticCode === wantedStaticInfo) {
       closure.outerCtx = ctx;
       closure.capture(closure.staticCode.freshBlock());
-    } else if (ctx && ctx.$$outer && ctx.$$outer.$$outer && ctx.$$outer.$$outer.codeRef().staticCode === wantedStaticInfo) {
+    } else if (ctx && ctx.$$outer && ctx.$$outer.$$outer &&
+               ctx.$$outer.$$outer.codeRef().staticCode === wantedStaticInfo) {
       /* workaround for rakudo emitting incorrectly nested closures */
       closure.outerCtx = ctx.$$outer.$$outer;
       closure.capture(closure.staticCode.freshBlock());
     } else {
       /* HACK - workaround for rakudo bugs */
-      //console.log("HORRIBLE hack - p6capturelex will do nothing");
+      // console.log("HORRIBLE hack - p6capturelex will do nothing");
     }
 
     return codeObj;
@@ -162,14 +162,14 @@ module.exports.load = function(nqp, CodeRef, Capture, containerSpecs) {
     let find = ctx;
 
     while (find) {
-        if (find.codeRef().staticCode === wantedStaticInfo) {
-          closure.outerCtx = find;
-          closure.capture(closure.staticCode.freshBlock());
-          return codeObj;
-        }
-        find = find.$$caller;
+      if (find.codeRef().staticCode === wantedStaticInfo) {
+        closure.outerCtx = find;
+        closure.capture(closure.staticCode.freshBlock());
+        return codeObj;
+      }
+      find = find.$$caller;
     }
-  //  console.log("HORRIBLE hack - p6capturelexwhere will do nothing");
+    //  console.log("HORRIBLE hack - p6capturelexwhere will do nothing");
 
     return codeObj;
   };
@@ -203,37 +203,38 @@ module.exports.load = function(nqp, CodeRef, Capture, containerSpecs) {
     return cont;
   };
 
-
   op.p6argvmarray = /*async*/ function(ctx, args) {
     const array = [];
-    for (let i=2; i < args.length; i++) {
-      array[i-2] = /*await*/ nqp.op.hllizefor(ctx, nqp.arg(nqp.getHLL('perl6'), args[i]), 'perl6');
+    for (let i = 2; i < args.length; i++) {
+      array[i - 2] = /*await*/ nqp.op.hllizefor(
+          ctx, nqp.arg(nqp.getHLL('perl6'), args[i]), 'perl6');
     }
     return nqp.createArray(array);
   };
 
-  op.p6decodelocaltime = function(sinceEpoch) {
+  op.p6decodelocaltime =
+      function(sinceEpoch) {
     let date = new Date(sinceEpoch * 1000);
 
     return nqp.createIntArray([
-      date.getSeconds(),
-      date.getMinutes(),
-      date.getHours(),
-      date.getDate(),
-      date.getMonth()+1,
-      date.getFullYear()
+      date.getSeconds(), date.getMinutes(), date.getHours(), date.getDate(),
+      date.getMonth() + 1, date.getFullYear()
     ]);
   }
 
-  op.p6finddispatcher = /*async*/ function(ctx, usage) {
+      op.p6finddispatcher = /*async*/ function(ctx, usage) {
     let dispatcher;
     let search = ctx.$$caller;
     while (search) {
       /* Do we have a dispatcher here? */
-      if (search.hasOwnProperty("$*DISPATCHER") && search["$*DISPATCHER"] !== Null) {
+      if (search.hasOwnProperty("$*DISPATCHER") &&
+          search["$*DISPATCHER"] !== Null) {
         dispatcher = search["$*DISPATCHER"];
         if (dispatcher.$$typeObject) {
-          dispatcher = /*await*/ dispatcher.p6$vivify_for(ctx, null, dispatcher, search.codeRef().codeObj, search, new Capture(search.$$args[1], Array.prototype.slice.call(search.$$args, 2)));
+          dispatcher = /*await*/ dispatcher.p6$vivify_for(
+              ctx, null, dispatcher, search.codeRef().codeObj, search,
+              new Capture(search.$$args[1],
+                          Array.prototype.slice.call(search.$$args, 2)));
           search["$*DISPATCHER"] = dispatcher;
         }
         return dispatcher;
@@ -243,11 +244,10 @@ module.exports.load = function(nqp, CodeRef, Capture, containerSpecs) {
 
     const thrower = getThrower("X::NoDispatcher");
     if (thrower === Null) {
-        /*await*/ ctx.die(usage + ' is not in the dynamic scope of a dispatcher');
+      /*await*/ ctx.die(usage + ' is not in the dynamic scope of a dispatcher');
     } else {
-        /*await*/ thrower.$$call(ctx, null, new nqp.NativeStrArg(usage));
+      /*await*/ thrower.$$call(ctx, null, new nqp.NativeStrArg(usage));
     }
-
   };
 
   op.p6argsfordispatcher = function(ctx, dispatcher) {
@@ -255,7 +255,8 @@ module.exports.load = function(nqp, CodeRef, Capture, containerSpecs) {
     while (search) {
       /* Do we have the dispatcher we're looking for? */
       if (search['$*DISPATCHER'] === dispatcher) {
-        return new Capture(search.$$args[1], Array.prototype.slice.call(search.$$args, 2));
+        return new Capture(search.$$args[1],
+                           Array.prototype.slice.call(search.$$args, 2));
       }
       /* Follow dynamic chain. */
       search = search.$$caller;
@@ -264,14 +265,16 @@ module.exports.load = function(nqp, CodeRef, Capture, containerSpecs) {
   };
 
   op.p6sink = /*async*/ function(ctx, obj) {
-    if (obj.$$typeObject || obj === Null) return;
+    if (obj.$$typeObject || obj === Null)
+      return;
     if (/*await*/ obj.$$can(ctx, 'sink')) {
       /*await*/ obj.p6$sink(ctx, null, obj);
     }
   };
 
   op.p6staticouter = function(ctx, codeRef) {
-    if (!(codeRef instanceof CodeRef)) throw new nqp.NQPException("p6staticouter must be used on a CodeRef");
+    if (!(codeRef instanceof CodeRef))
+      throw new nqp.NQPException("p6staticouter must be used on a CodeRef");
     return codeRef.staticCode.outerCodeRef;
   };
 
@@ -299,7 +302,6 @@ module.exports.load = function(nqp, CodeRef, Capture, containerSpecs) {
     const invokingUnder = new nqp.Ctx(ctx, fakeCode.outerCtx, fakeCode);
 
     return nqp.retval(currentHLL, /*await*/ code.$$call(invokingUnder, null));
-
   };
 
   op.p6fakerun = /*async*/ function(HLL, options) {
@@ -311,9 +313,11 @@ module.exports.load = function(nqp, CodeRef, Capture, containerSpecs) {
 
     const env = options.content.get('env');
 
-    const rakudoLibrary = nqp.requireExtraStuff('./rakudo-library.nqp-raw-runtime');
+    const rakudoLibrary =
+        nqp.requireExtraStuff('./rakudo-library.nqp-raw-runtime');
 
-    const result = /*await*/ rakudoLibrary.capturedRun(code, input, compilerArgs, args, env);
+    const result = /*await*/ rakudoLibrary.capturedRun(code, input,
+                                                       compilerArgs, args, env);
 
     const hash = nqp.hash();
 
@@ -324,9 +328,7 @@ module.exports.load = function(nqp, CodeRef, Capture, containerSpecs) {
     return hash;
   };
 
-  function RakudoScalar(STable) {
-    this.STable = STable;
-  }
+  function RakudoScalar(STable) { this.STable = STable; }
 
   RakudoScalar.prototype.configure = function(conf) {
     this.store = conf.content.get('store');
@@ -347,44 +349,45 @@ module.exports.load = function(nqp, CodeRef, Capture, containerSpecs) {
       return store_unchecked.$$call(ctx, null, this, value);
     });
 
-    this.STable.addInternalMethod('$$assign', function(ctx, value) {
-      return store.$$call(ctx, null, this, value);
-    });
+    this.STable.addInternalMethod(
+        '$$assign',
+        function(ctx, value) { return store.$$call(ctx, null, this, value); });
 
-    this.STable.addInternalMethod('$$decont', function(ctx) {
-      return this.$$getattr(Scalar, '$!value');
-    });
+    this.STable.addInternalMethod(
+        '$$decont',
+        function(ctx) { return this.$$getattr(Scalar, '$!value'); });
 
-    this.STable.addInternalMethod('$$decont_s', function(ctx) {
-      return this.$$getattr(Scalar, '$!value').$$getStr();
-    });
+    this.STable.addInternalMethod(
+        '$$decont_s',
+        function(ctx) { return this.$$getattr(Scalar, '$!value').$$getStr(); });
 
-    this.STable.addInternalMethod('$$getInt', function(ctx) {
-      return this.$$getattr(Scalar, '$!value').$$getInt();
-    });
+    this.STable.addInternalMethod(
+        '$$getInt',
+        function(ctx) { return this.$$getattr(Scalar, '$!value').$$getInt(); });
 
-    this.STable.addInternalMethod('$$getInt64', function(ctx) {
-      return this.$$getattr(Scalar, '$!value').$$getInt64();
-    });
+    this.STable.addInternalMethod(
+        '$$getInt64',
+        function(
+            ctx) { return this.$$getattr(Scalar, '$!value').$$getInt64(); });
 
-    this.STable.addInternalMethod('$$getUint64', function(ctx) {
-      return this.$$getattr(Scalar, '$!value').$$getUint64();
-    });
+    this.STable.addInternalMethod(
+        '$$getUint64',
+        function(
+            ctx) { return this.$$getattr(Scalar, '$!value').$$getUint64(); });
 
-    this.STable.addInternalMethod('$$getStr', function(ctx) {
-      return this.$$getattr(Scalar, '$!value').$$getStr();
-    });
+    this.STable.addInternalMethod(
+        '$$getStr',
+        function(ctx) { return this.$$getattr(Scalar, '$!value').$$getStr(); });
 
-    this.STable.addInternalMethod('$$getNum', function(ctx) {
-      return this.$$getattr(Scalar, '$!value').$$getNum();
-    });
+    this.STable.addInternalMethod(
+        '$$getNum',
+        function(ctx) { return this.$$getattr(Scalar, '$!value').$$getNum(); });
 
-    this.STable.addInternalMethod('$$iscont', function() {
-      return 1;
-    });
+    this.STable.addInternalMethod('$$iscont', function() { return 1; });
 
     this.STable.addInternalMethod('$$isrwcont', function() {
-      if (this.$$typeObject) return 0;
+      if (this.$$typeObject)
+        return 0;
       let desc = this.$$getattr(Scalar, '$!descriptor');
       return desc === Null ? 0 : 1;
     });
@@ -404,5 +407,5 @@ module.exports.load = function(nqp, CodeRef, Capture, containerSpecs) {
 
   containerSpecs.rakudo_scalar = RakudoScalar;
 
-  nqp.loadOps({op: op});
+  nqp.loadOps({op : op});
 };
