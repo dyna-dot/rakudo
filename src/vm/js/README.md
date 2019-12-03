@@ -13,6 +13,7 @@ npm init
 npm install --save rakudo
 ./node_modules/.bin/perl6-js -e 'say "Hello World"'
 ```
+
 # Using a node.js module
 
 ```bash
@@ -22,7 +23,7 @@ npm install --save chalk
 
 To use node.js modules you need to specify where they should be looked for.
 
-```use lib 'nodejs#/your/path/to/node_modules'``` is a good way to do that.
+`use lib 'nodejs#/your/path/to/node_modules'` is a good way to do that.
 
 ```
 use lib 'nodejs#' ~ $*PROGRAM.parent.add('node_modules').absolute;
@@ -31,17 +32,17 @@ say("Hello {chalk.blue("Blue")} World");
 ```
 
 Keep in mind that if you load a node.js module during precompilation it gets
-*reloaded* at runtime, so it's internal state gets lost.
+_reloaded_ at runtime, so it's internal state gets lost.
 
 # Interoperability with JS
 
 Passing :lang<JavaScript> to eval will execute the passed code as JavaScript.
 
-my $document = EVAL(:lang<JavaScript>, 'return document')
+my \$document = EVAL(:lang<JavaScript>, 'return document')
 
-You can access attributes of those objects using postcircumfix:<{ }>
-(you should often use the <> shorcut)
-You can call methods on the the objects using regular Perl 6 syntax.
+You can access attributes of those objects using postcircumfix:<{ }> (you should
+often use the <> shorcut) You can call methods on the the objects using regular
+Perl 6 syntax.
 
 ```perl6
 $document<body>.appendChild($document.createTextNode('Hello World'));
@@ -49,15 +50,15 @@ $document<body>.appendChild($document.createTextNode('Hello World'));
 
 Primitive JS data types are converted rather then wrapped
 
-| JavaScript   | Perl6 |
-| -------------|-------|
-| true         | True  |
-| false        | False |
-| String       | Str   |
-| null         | Mu    |
-| undefined    | Mu    |
-| BigInt       | Int   |
-| Number       | Num   |
+| JavaScript | Perl6 |
+| ---------- | ----- |
+| true       | True  |
+| false      | False |
+| String     | Str   |
+| null       | Mu    |
+| undefined  | Mu    |
+| BigInt     | Int   |
+| Number     | Num   |
 
 A Perl 6 Mu when passed to JS land ends up as null
 
@@ -70,26 +71,26 @@ EVAL(:lang<JavaScript>, 'return 123') # This returns 123
 
 # Extra methods on wrapped JS objects
 
-In order to enable using wrapped objects in Perl 6 land wrapped objects
-offer some methods that Perl 6 expects.
+In order to enable using wrapped objects in Perl 6 land wrapped objects offer
+some methods that Perl 6 expects.
 
-* sink
+- sink
 
   Does nothing.
 
-* defined
+- defined
 
-  Always returns True  
+  Always returns True
 
-* Bool
+- Bool
 
-  Always returns True  
+  Always returns True
 
-* item
+- item
 
   Returns the object it is called on
 
-* new
+- new
 
   Uses the JavaScript new operator to create an new instance
 
@@ -99,10 +100,9 @@ offer some methods that Perl 6 expects.
   say($instance.getFullYear()); # 1995
   ```
 
+If the wrapped object has method of that same name you can use an :INTERNAL
+modifier to access it.
 
-If the wrapped object has method of that same name you can use an :INTERNAL modifier to access it.
+`$obj.new(:INTERNAL, 123)` | -------------|-------|
 
-```$obj.new(:INTERNAL, 123)``` 
-| -------------|-------|
-
-This will call a js new method rather then doing ``new $obj(123)```
+This will call a js new method rather then doing ``new \$obj(123)```
