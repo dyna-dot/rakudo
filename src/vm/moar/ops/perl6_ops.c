@@ -27,8 +27,9 @@ static MVMCallsiteEntry one_str_flags[] = { MVM_CALLSITE_ARG_STR };
 static MVMCallsite     one_str_callsite = { one_str_flags, 1, 1, 1, 0, 0, NULL, NULL };
 
 /* Dispatcher vivify_for callsite. */
-static MVMCallsiteEntry disp_flags[] = { MVM_CALLSITE_ARG_OBJ, MVM_CALLSITE_ARG_OBJ, 
-                                         MVM_CALLSITE_ARG_OBJ, MVM_CALLSITE_ARG_OBJ };
+static MVMCallsiteEntry disp_flags[] = { MVM_CALLSITE_ARG_OBJ, MVM_CALLSITE_ARG_OBJ,
+                                         MVM_CALLSITE_ARG_OBJ, MVM_CALLSITE_ARG_OBJ
+                                       };
 static MVMCallsite     disp_callsite = { disp_flags, 4, 4, 4, 0, 0, NULL, NULL };
 
 /* Are we initialized yet? */
@@ -262,20 +263,20 @@ static void p6finddispatcher(MVMThreadContext *tc, MVMuint8 *cur_op) {
                     MVMObject *meth, *p6sub, *ctx_ref, *capture;
                     MVMRegister *res_reg = &GET_REG(tc, 0);
                     MVMROOT(tc, dispatcher, {
-                    MVMROOT(tc, ctx, {
-                        ctx_ref = MVM_repr_alloc_init(tc, tc->instance->boot_types.BOOTContext);
-                        MVM_ASSIGN_REF(tc, &(ctx_ref->header),
-                                ((MVMContext *)ctx_ref)->body.context, ctx);
-                        MVMROOT(tc, ctx_ref, {
-                            capture = MVM_args_use_capture(tc, ctx);
-                            MVMROOT(tc, capture, {
-                                p6sub = MVM_frame_get_code_object(tc, (MVMCode *)ctx->code_ref);
-                                MVMROOT(tc, p6sub, {
-                                    meth = MVM_6model_find_method_cache_only(tc, dispatcher, str_vivify_for);
+                        MVMROOT(tc, ctx, {
+                            ctx_ref = MVM_repr_alloc_init(tc, tc->instance->boot_types.BOOTContext);
+                            MVM_ASSIGN_REF(tc, &(ctx_ref->header),
+                                           ((MVMContext *)ctx_ref)->body.context, ctx);
+                            MVMROOT(tc, ctx_ref, {
+                                capture = MVM_args_use_capture(tc, ctx);
+                                MVMROOT(tc, capture, {
+                                    p6sub = MVM_frame_get_code_object(tc, (MVMCode *)ctx->code_ref);
+                                    MVMROOT(tc, p6sub, {
+                                        meth = MVM_6model_find_method_cache_only(tc, dispatcher, str_vivify_for);
+                                    });
                                 });
                             });
                         });
-                    });
                     });
 
                     /* Lookup method, invoke it, and set up callback to ensure it
@@ -288,7 +289,7 @@ static void p6finddispatcher(MVMThreadContext *tc, MVMuint8 *cur_op) {
                         srd[0] = disp_lex;
                         srd[1] = res_reg;
                         MVM_frame_special_return(tc, tc->cur_frame, store_dispatcher,
-                            NULL, srd, NULL);
+                                                 NULL, srd, NULL);
                     }
                     tc->cur_frame->args[0].o = dispatcher;
                     tc->cur_frame->args[1].o = p6sub;
@@ -320,8 +321,8 @@ static void p6finddispatcher(MVMThreadContext *tc, MVMuint8 *cur_op) {
         }
         else {
             MVM_exception_throw_adhoc(tc,
-                "%s is not in the dynamic scope of a dispatcher",
-                MVM_string_utf8_encode_C_string(tc, usage));
+                                      "%s is not in the dynamic scope of a dispatcher",
+                                      MVM_string_utf8_encode_C_string(tc, usage));
         }
     }
 }
@@ -393,8 +394,8 @@ static void p6staticouter(MVMThreadContext *tc, MVMuint8 *cur_op) {
     if (!MVM_is_null(tc, code) && IS_CONCRETE(code) && REPR(code)->ID == MVM_REPR_ID_MVMCode) {
         MVMStaticFrame *sf = ((MVMCode *)code)->body.sf;
         GET_REG(tc, 0).o = sf->body.outer
-            ? (MVMObject *)sf->body.outer->body.static_code
-            : NULL;
+                           ? (MVMObject *)sf->body.outer->body.static_code
+                           : NULL;
     }
     else {
         MVM_exception_throw_adhoc(tc, "p6staticouter requires a CodeRef");

@@ -49,8 +49,8 @@ static int starts_with(const char *str, const char *want) {
     size_t str_len  = strlen(str);
     size_t want_len = strlen(want);
     return str_len < want_len
-        ? 0
-        : strncmp(str, want, want_len) == 0;
+           ? 0
+           : strncmp(str, want, want_len) == 0;
 }
 
 static int parse_flag(const char *arg)
@@ -94,12 +94,12 @@ void platformify_path(char *path) {
 }
 
 int retrieve_home(
-          char  **out_home,
+    char  **out_home,
     const char   *rel_home,
     const size_t  rel_home_size,
     const char   *env_var,
-          char   *exec_dir_path,
-          size_t  exec_dir_path_size,
+    char   *exec_dir_path,
+    size_t  exec_dir_path_size,
     const char   *check_file,
     const size_t  check_file_size
 ) {
@@ -154,15 +154,15 @@ int wmain(int argc, wchar_t *wargv[])
     char   *exec_dir_path_temp;
     size_t  exec_dir_path_size;
 
-          char   *nqp_home;
-          size_t  nqp_home_size;
+    char   *nqp_home;
+    size_t  nqp_home_size;
     const char    nqp_rel_path[14]    = "/../share/nqp";
     const size_t  nqp_rel_path_size   = 13;
     const char    nqp_check_path[28]  = "/lib/NQPCORE.setting.moarvm";
     const size_t  nqp_check_path_size = 27;
 
-          char   *rakudo_home;
-          size_t  rakudo_home_size;
+    char   *rakudo_home;
+    size_t  rakudo_home_size;
     const char    perl6_rel_path[16]    = "/../share/perl6";
     const size_t  perl6_rel_path_size   = 15;
     const char    perl6_check_path[22]  = "/runtime/perl6.moarvm";
@@ -210,38 +210,38 @@ int wmain(int argc, wchar_t *wargv[])
 
     for (; (flag = parse_flag(argv[argi])) != NOT_A_FLAG; ++argi) {
         switch (flag) {
-            case FLAG_FULL_CLEANUP:
+        case FLAG_FULL_CLEANUP:
             full_cleanup = 1;
             continue;
 
 #if MVM_TRACING
-            case FLAG_TRACING:
+        case FLAG_TRACING:
             MVM_interp_enable_tracing();
             continue;
 #endif
 
-            case FLAG_SUSPEND:
+        case FLAG_SUSPEND:
             start_suspended = 1;
             continue;
 
-            case OPT_DEBUGPORT: {
-                MVMint64 port;
-                char *portstr = argv[argi] + strlen("--debug-port=");
-                char *endptr;
-                port = strtoll(portstr, &endptr, 10);
-                if (*endptr != '\0') {
-                    fprintf(stderr, "ERROR: Invalid characters in debug port flag: %s\n", portstr);
-                    return EXIT_FAILURE;
-                }
-                if (port <= 1024 || 65535 < port) {
-                    fprintf(stderr, "ERROR: debug server port out of range. We only accept ports above 1024 and below 65535. (got: %"PRIi64")\n", port);
-                    return EXIT_FAILURE;
-                }
-                debugserverport = (MVMuint32)port;
-                break;
+        case OPT_DEBUGPORT: {
+            MVMint64 port;
+            char *portstr = argv[argi] + strlen("--debug-port=");
+            char *endptr;
+            port = strtoll(portstr, &endptr, 10);
+            if (*endptr != '\0') {
+                fprintf(stderr, "ERROR: Invalid characters in debug port flag: %s\n", portstr);
+                return EXIT_FAILURE;
             }
+            if (port <= 1024 || 65535 < port) {
+                fprintf(stderr, "ERROR: debug server port out of range. We only accept ports above 1024 and below 65535. (got: %"PRIi64")\n", port);
+                return EXIT_FAILURE;
+            }
+            debugserverport = (MVMuint32)port;
+            break;
+        }
 
-            default:
+        default:
             argv[new_argc++] = argv[argi];
         }
     }
@@ -259,11 +259,11 @@ int wmain(int argc, wchar_t *wargv[])
         FILE *fp;
         snprintf(path, 255, "%s.%d", getenv("MVM_TELEMETRY_LOG"),
 #ifdef _WIN32
-             _getpid()
+                 _getpid()
 #else
-             getpid()
+                 getpid()
 #endif
-             );
+                );
         fp = fopen(path, "w");
         if (fp) {
             MVM_telemetry_init(fp);
@@ -292,7 +292,7 @@ int wmain(int argc, wchar_t *wargv[])
     nqp_home = STRINGIFY(STATIC_NQP_HOME);
 #else
     if (!retrieve_home(&nqp_home, nqp_rel_path, nqp_rel_path_size, "NQP_HOME",
-            exec_dir_path, exec_dir_path_size, nqp_check_path, nqp_check_path_size)) {
+                       exec_dir_path, exec_dir_path_size, nqp_check_path, nqp_check_path_size)) {
         fprintf(stderr, "ERROR: NQP_HOME is invalid: %s\n", nqp_home);
         return EXIT_FAILURE;
     }
@@ -304,14 +304,14 @@ int wmain(int argc, wchar_t *wargv[])
 #else
     if (getenv("PERL6_HOME")) {
         if (!retrieve_home(&rakudo_home, perl6_rel_path, perl6_rel_path_size, "PERL6_HOME",
-                exec_dir_path, exec_dir_path_size, perl6_check_path, perl6_check_path_size)) {
+                           exec_dir_path, exec_dir_path_size, perl6_check_path, perl6_check_path_size)) {
             fprintf(stderr, "ERROR: PERL6_HOME is invalid: %s\n", rakudo_home);
             return EXIT_FAILURE;
         }
     }
     else {
         if (!retrieve_home(&rakudo_home, perl6_rel_path, perl6_rel_path_size, "RAKUDO_HOME",
-                exec_dir_path, exec_dir_path_size, perl6_check_path, perl6_check_path_size)) {
+                           exec_dir_path, exec_dir_path_size, perl6_check_path, perl6_check_path_size)) {
             fprintf(stderr, "ERROR: RAKUDO_HOME is invalid: %s\n", rakudo_home);
             return EXIT_FAILURE;
         }
