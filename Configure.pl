@@ -11,28 +11,31 @@ use Cwd;
 use FindBin;
 
 BEGIN {
-    my $set_config = !qx{git config rakudo.initialized};
-    unless ( -e '3rdparty/nqp-configure/LICENSE' ) {
-        print "Updating nqp-configure submodule...\n";
-        my $msg =
+    if ( -d '.git' ) {
+        my $set_config = !qx{git config rakudo.initialized};
+        unless ( -e '3rdparty/nqp-configure/LICENSE' ) {
+            print "Updating nqp-configure submodule...\n";
+            my $msg =
 qx{git submodule sync --quiet 3rdparty/nqp-configure && git submodule --quiet update --init 3rdparty/nqp-configure 2>&1};
-        if ( $? >> 8 == 0 ) {
-            say "OK";
-            $set_config = 1;
-        }
-        else {
-            if ( $msg =~ /[']([^']+)[']\s+already exists and is not an empty/ )
-            {
-                print "\n===SORRY=== ERROR: "
-                  . "Cannot update submodule because directory exists and is not empty.\n"
-                  . ">>> Please delete the following folder and try again:\n$1\n\n";
-                exit 1;
+            if ( $? >> 8 == 0 ) {
+                say "OK";
+                $set_config = 1;
+            }
+            else {
+                if ( $msg =~
+                    /[']([^']+)[']\s+already exists and is not an empty/ )
+                {
+                    print "\n===SORRY=== ERROR: "
+                      . "Cannot update submodule because directory exists and is not empty.\n"
+                      . ">>> Please delete the following folder and try again:\n$1\n\n";
+                    exit 1;
+                }
             }
         }
-    }
-    if ($set_config) {
-        system("git config submodule.recurse true");
-        system("git config rakudo.initialized 1");
+        if ($set_config) {
+            system("git config submodule.recurse true");
+            system("git config rakudo.initialized 1");
+        }
     }
 }
 
@@ -60,20 +63,22 @@ MAIN: {
     $config->{$config_status} = join ' ', map { qq("$_") } @ARGV;
 
     GetOptions(
-        $cfg->options,      'help!',
-        'prefix=s',         'libdir=s',
-        'sysroot=s',        'sdkroot=s',
-        'relocatable',      'backends=s',
-        'no-clean',         'with-nqp=s',
-        'gen-nqp:s',        'gen-moar:s',
-        'moar-option=s@',   'git-protocol=s',
-        'ignore-errors',    'make-install!',
-        'makefile-timing!', 'git-depth=s',
-        'git-reference=s',  'github-user=s',
-        'rakudo-repo=s',    'nqp-repo=s',
-        'moar-repo=s',      'roast-repo=s',
-        'expand=s',         'out=s',
-        'set-var=s@',
+        $cfg->options,    'help!',
+        'prefix=s',       'rakudo-home|perl6-home=s',
+        'nqp-home=s',     'sysroot=s',
+        'sdkroot=s',      'relocatable!',
+        'backends=s',     'no-clean',
+        'with-nqp=s',     'gen-nqp:s',
+        'gen-moar:s',     'moar-option=s@',
+        'git-protocol=s', 'ignore-errors!',
+        'make-install!',  'makefile-timing!',
+        'git-depth=s',    'git-reference=s',
+        'github-user=s',  'rakudo-repo=s',
+        'nqp-repo=s',     'moar-repo=s',
+        'roast-repo=s',   'expand=s',
+        'out=s',          'set-var=s@',
+        'silent-build!',  'raku-alias!',
+        'force-rebuild!'
       )
       or do {
         print_help();
@@ -117,7 +122,7 @@ MAIN: {
     unless ( $cfg->opt('expand') ) {
         my $make = $cfg->cfg('make');
 
-        unless ( $cfg->opt('no-clean') ) {
+        if ( $cfg->opt('clean') ) {
             no warnings;
             print "Cleaning up ...\n";
             if ( open my $CLEAN, '-|', "$make clean" ) {
@@ -149,13 +154,15 @@ Configure.pl - $lang Configure
 General Options:
     --help             Show this text
     --prefix=<path>    Install files in dir; also look for executables there
-    --libdir=<path>    Install architecture-specific files in dir; Perl6 modules
-                       included
+    --nqp-home=dir     Directory to install NQP files to
+    --perl6-home=dir, --rakudo-home=dir   
+                       Directory to install Rakudo files to
     --relocatable
                        Dynamically locate NQP and Perl6 home dirs instead of
                        statically compiling them in. (On AIX and OpenBSD Rakudo
                        is always built non-relocatable, since both OSes miss a
                        necessary mechanism.)
+    --no-raku-alias    Don't create `raku` alias for `rakudo` binary
     --sdkroot=<path>   When given, use for searching build tools here, e.g.
                        nqp, java, node etc.
     --sysroot=<path>   When given, use for searching runtime components here
@@ -167,6 +174,10 @@ General Options:
     --gen-moar[=branch]
                        Download, build, and install a copy of MoarVM to use
                        before writing the Makefile
+    --force-rebuild    
+                       Together with --gen-* options causes corresponding
+                       components to recompile irrelevant to their existence and
+                       version conformance.
     --with-nqp=<path>
                        Provide path to already installed nqp
     --make-install     Install Rakudo after configuration is done
@@ -202,6 +213,7 @@ General Options:
     --set-var="config_variable=value"
                        Sets a config_variable to "value". Can be used multiple
                        times.
+   --no-silent-build   Don't echo commands in Makefile target receipt.
 
 Please note that the --gen-moar and --gen-nqp options are there for convenience
 only and will actually immediately - at Configure time - compile and install

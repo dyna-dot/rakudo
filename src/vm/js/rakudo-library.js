@@ -1,4 +1,4 @@
-const nqp = require('nqp-runtime');
+const nqp = require("nqp-runtime");
 
 let passedArgs;
 
@@ -6,30 +6,29 @@ let oldArgs;
 
 function fakeArgs(isMain) {
   return isMain ? passedArgs.map(arg => new nqp.NativeStrArg(arg)) : [];
-};
-
+}
 
 const code = /*async*/ function() {
-  /*await*/ require('./rakudo.js')(nqp, true);
+  /*await*/ require("./perl6.js")(nqp, true);
 };
 
-const core = require('nqp-runtime/core.js');
+const core = require("nqp-runtime/core.js");
 
 module.exports.compile = function(source, options = {}) {
   const oldGlobalContext = nqp.freshGlobalContext();
 
   const oldArgs = nqp.args;
   nqp.args = fakeArgs;
-  const tmp = require('tmp');
+  const tmp = require("tmp");
   const tmpFile = tmp.tmpNameSync();
 
-  passedArgs = ['perl6-js', '--output', tmpFile, '--target=js', source];
+  passedArgs = ["perl6-js", "--output", tmpFile, "--target=js", source];
 
   if (!options.sourceMap) {
-    passedArgs.splice(1, 0, '--no-source-map');
+    passedArgs.splice(1, 0, "--no-source-map");
   }
 
-  if (Object.prototype.hasOwnProperty.call(nqp.op.getstdout(), '$$writefh')) {
+  if (Object.prototype.hasOwnProperty.call(nqp.op.getstdout(), "$$writefh")) {
     throw `Can't overwrite $$writefh on stdout, it's already set`;
   }
 
@@ -37,7 +36,7 @@ module.exports.compile = function(source, options = {}) {
 
   nqp.op.getstdout().$$writefh = function(buf) {
     output.push(core.toRawBuffer(buf));
-  }
+  };
 
   if (options.rakudoPrecompWith) {
     const oldValue = options.rakudoPrecompWith;
@@ -50,16 +49,20 @@ module.exports.compile = function(source, options = {}) {
 
   delete nqp.op.getstdout().$$writefh;
 
-  const lines = Buffer.concat(output).toString().split(/\n/);
+  const lines = Buffer.concat(output)
+    .toString()
+    .split(/\n/);
 
   const loaded = [];
 
   for (const line of lines) {
     let match;
     if (/^[A-Z0-9]{40}\0/.test(line)) {
-    } else if (match = line.match(/^LOAD-UNIT ID:(.*?) DEPS:(.*?) PATH:(.*)/)) {
-      const deps = match[2] == '' ? [] : match[2].split(',');
-      loaded.push({id: match[1], deps: deps, path: match[3]});
+    } else if (
+      (match = line.match(/^LOAD-UNIT ID:(.*?) DEPS:(.*?) PATH:(.*)/))
+    ) {
+      const deps = match[2] == "" ? [] : match[2].split(",");
+      loaded.push({ id: match[1], deps: deps, path: match[3] });
     } else {
       // console.warn('extra line', line);
     }
@@ -69,17 +72,25 @@ module.exports.compile = function(source, options = {}) {
 
   nqp.setGlobalContext(oldGlobalContext);
 
-  const fs = require('fs');
-  const returnValue = {js: fs.readFileSync(tmpFile, 'utf8'), loaded: loaded};
+  const fs = require("fs");
+  const returnValue = { js: fs.readFileSync(tmpFile, "utf8"), loaded: loaded };
 
   if (options.sourceMap) {
-    returnValue.sourceMap = JSON.parse(fs.readFileSync(tmpFile + '.map', 'utf8'));
+    returnValue.sourceMap = JSON.parse(
+      fs.readFileSync(tmpFile + ".map", "utf8")
+    );
   }
 
   return returnValue;
 };
 
-module.exports.capturedRun = /*async*/ function(source, input, compileArgs, args, passedEnv) {
+module.exports.capturedRun = /*async*/ function(
+  source,
+  input,
+  compileArgs,
+  args,
+  passedEnv
+) {
   const oldGlobalContext = nqp.freshGlobalContext();
 
   const env = nqp.hash();
@@ -108,7 +119,7 @@ module.exports.capturedRun = /*async*/ function(source, input, compileArgs, args
   const out = [];
   const err = [];
 
-  passedArgs = ['perl6-js'].concat(compileArgs, ['*SOURCE*'], args);
+  passedArgs = ["perl6-js"].concat(compileArgs, ["*SOURCE*"], args);
 
   const oldExit = nqp.op.exit;
 
@@ -122,7 +133,7 @@ module.exports.capturedRun = /*async*/ function(source, input, compileArgs, args
     throw new Exit(status);
   };
 
-  if (Object.prototype.hasOwnProperty.call(nqp.op.getstdout(), '$$writefh')) {
+  if (Object.prototype.hasOwnProperty.call(nqp.op.getstdout(), "$$writefh")) {
     throw `Can't overwrite $$writefh on stdout, it's already set`;
   }
 
@@ -130,7 +141,7 @@ module.exports.capturedRun = /*async*/ function(source, input, compileArgs, args
     out.push(core.toRawBuffer(buf));
   };
 
-  if (Object.prototype.hasOwnProperty.call(nqp.op.getstderr(), '$$writefh')) {
+  if (Object.prototype.hasOwnProperty.call(nqp.op.getstderr(), "$$writefh")) {
     throw `Can't overwrite $$writefh on stderr, it's already set`;
   }
 
@@ -142,23 +153,23 @@ module.exports.capturedRun = /*async*/ function(source, input, compileArgs, args
 
   class ReadFromStringHandle {
     constructor(source, flag) {
-      this.source = Buffer.from(source, 'utf8');
+      this.source = Buffer.from(source, "utf8");
     }
 
     $$readfh(buf, bytes) {
-      if (this.flag) console.log('$$readfh');
+      if (this.flag) console.log("$$readfh");
       core.writeBuffer(buf, 0, this.source.slice(0, bytes));
       this.source = this.source.slice(bytes);
       return buf;
     }
 
     $$eoffh() {
-      if (this.flag) console.log('$$eoffh');
-      return (this.source.length === 0 ? 1 : 0);
+      if (this.flag) console.log("$$eoffh");
+      return this.source.length === 0 ? 1 : 0;
     }
 
     $$closefh() {
-      if (this.flag) console.log('$$closefh');
+      if (this.flag) console.log("$$closefh");
     }
 
     $$decont(ctx) {
@@ -180,7 +191,7 @@ module.exports.capturedRun = /*async*/ function(source, input, compileArgs, args
     $$toBool(ctx) {
       return 1;
     }
-  };
+  }
 
   const oldGetstdin = nqp.op.getstdin;
 
@@ -191,7 +202,7 @@ module.exports.capturedRun = /*async*/ function(source, input, compileArgs, args
   };
 
   nqp.op.open = function(name, mode) {
-    if (name === '*SOURCE*') {
+    if (name === "*SOURCE*") {
       return new ReadFromStringHandle(source);
     } else {
       return oldOpen(name, mode);
@@ -204,9 +215,9 @@ module.exports.capturedRun = /*async*/ function(source, input, compileArgs, args
   const ISDIR = 2;
 
   nqp.op.stat = function(file, code) {
-    if (file === '*SOURCE*' && code === EXISTS) {
+    if (file === "*SOURCE*" && code === EXISTS) {
       return 1;
-    } else if (file === '*SOURCE*' && code === ISDIR) {
+    } else if (file === "*SOURCE*" && code === ISDIR) {
       return 0;
     } else {
       return oldStat(file, code);

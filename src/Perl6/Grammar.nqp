@@ -784,7 +784,6 @@ grammar Perl6::Grammar is HLL::Grammar does STD {
         :my $*NEXT_STATEMENT_ID := 1;              # to give each statement an ID
         :my $*IN_STMT_MOD := 0;                    # are we inside a statement modifier?
         :my $*COMPILING_CORE_SETTING := 0;         # are we compiling CORE.setting?
-        # TODO XXX: see https://github.com/rakudo/rakudo/issues/2432
         :my $*SET_DEFAULT_LANG_VER := 1;
         :my %*SIG_INFO;                            # information about recent signature
         :my $*CAN_LOWER_TOPIC := 1;                # true if we optimize the $_ lexical away
@@ -806,6 +805,8 @@ grammar Perl6::Grammar is HLL::Grammar does STD {
         :my $*DECLARATOR_DOCS;
         :my $*PRECEDING_DECL; # for #= comments
         :my $*PRECEDING_DECL_LINE := -1; # XXX update this when I see another comment like it?
+        :my $*keep-decl := nqp::existskey(nqp::getenvhash(), 'RAKUDO_POD_DECL_BLOCK_USER_FORMAT');
+
         # TODO use these vars to implement S26 pod data block handling
         :my $*DATA-BLOCKS := [];
         :my %*DATA-BLOCKS := {};
@@ -822,11 +823,11 @@ grammar Perl6::Grammar is HLL::Grammar does STD {
 
         {
             nqp::getcomp('perl6').reset_language_version();
-            $*W.loading_and_symbol_setup($/)
+            $*W.comp_unit_stage0($/)
         }
 
         <.bom>?
-        <lang-version>
+        <lang-version> { $*W.comp_unit_stage1($/) }
         <.finishpad>
         <statementlist=.FOREIGN_LANG($*MAIN, 'statementlist', 1)>
 
@@ -1038,6 +1039,8 @@ grammar Perl6::Grammar is HLL::Grammar does STD {
     token block($*IMPLICIT = 0) {
         :my $*DECLARAND := $*W.stub_code_object('Block');
         :my $*CODE_OBJECT := $*DECLARAND;
+        :my $*SIG_OBJ;
+        :my %*SIG_INFO;
         :dba('scoped block')
         :my $borg := $*BORG;
         :my $has_mystery := $*MYSTERY ?? 1 !! 0;
@@ -1742,7 +1745,7 @@ grammar Perl6::Grammar is HLL::Grammar does STD {
     }
 
     token special_variable:sym<$.> {
-        <sym> {} <!before \w | '(' | '^' >
+        <sym> {} <!before \w | '(' | ':' | '^' >
         <.obsvar('$.')>
     }
 
@@ -1815,7 +1818,12 @@ grammar Perl6::Grammar is HLL::Grammar does STD {
         | {} <sigil> <!{ $*QSIGIL }> <?MARKER('baresigil')>   # try last, to allow sublanguages to redefine sigils (like & in regex)
         ]
         [ <?{ $<twigil> && ( $<twigil> eq '.' || $<twigil> eq '.^' ) }>
-            [ <.unsp> | '\\' | <?> ] <?[(]> <!RESTRICTED> <arglist=.postcircumfix>
+            [ <.unsp> | '\\' | <?> ] <?[(:]> <!RESTRICTED>
+            :dba('method arguments')
+            [
+                | ':' <?before \s | '{'> <!{ $*QSIGIL }> <arglist>
+                | '(' <arglist> ')'
+            ]
         ]?
         { $*LEFTSIGIL := nqp::substr(self.orig(), self.from, 1) unless $*LEFTSIGIL }
     }
@@ -3631,9 +3639,29 @@ grammar Perl6::Grammar is HLL::Grammar does STD {
         :my $*VAR;
         :my $orig_arg_flat_ok := $*ARG_FLAT_OK;
         :dba('term')
+        # TODO try to use $/ for lookback to check for erroneous
+        #      use of pod6 trailing declarator block, e.g.:
+        #
+        #        #=!
+        #
+        #      instead of
+        #
+        #        #=(
+        #
         [
         ||  [
-            | <prefixish>+ [ <.arg_flat_nok> <term> || {} <.panic("Prefix " ~ $<prefixish>[-1].Str ~ " requires an argument, but no valid term found")> ]
+            | <prefixish>+
+
+              [ <.arg_flat_nok> <term>
+                ||
+                {}
+                   <.panic("Prefix " ~ $<prefixish>[-1].Str
+                                     ~ " requires an argument, but no valid term found"
+                                     ~ ".\nDid you mean "
+                                     ~ $<prefixish>[-1].Str
+                                     ~ " to be an opening bracket for a declarator block?"
+                          )>
+              ]
             | <.arg_flat_nok> <term>
             ]
         || <!{ $*QSIGIL }> <?before <infixish> {
@@ -4670,39 +4698,132 @@ if $*COMPILING_CORE_SETTING {
        '#' {} \N*
     }
 
+    #==========================================================
+    # Embedded comments and declarator blocks
+    #==========================================================
+    # These comment-like objects can be like ordinary one-line
+    # comments if, and only if, their beginning two-character
+    # starting points are followed by a space.  Examples:
+    #
+    # embedded:
+    #   #` some comment
+    # leading declarator block:
+    #   #| some comment
+    # trailing declarator block:
+    #   #= some comment
+    #
+    # If any character other than a space follows the first
+    # two, it must be a valid opening bracketing character,
+    # otherwise an exception is thrown.
+    #
+    # Note that declarator blocks retain their special handling
+    # even in the one-line format.
+    #==========================================================
+
+    #==========================================================
+    # An in-line or multi-line comment (aka 'embedded comment')
+    #==========================================================
+    # examples of valid ones:
+    #   in-line:
+    #     my $a = #`(    ) 3;
+    #   multi-line:
+    #     my $a = #`(
+    #       some comment
+    #     ) 3;
+    #     #`(
+    #       some comment
+    #     )
+    #   this is an ordinary trailing one-line comment:
+    #     my $a = #` some comment
+    #     3;
+    #
+    #==========================================================
+
+    #```````````
+    #|||||||||||||
+
+
+    # we panic when a non-opening bracket char follows the sym
+    token comment:sym<#`> {
+        '#`' <!after \s> <!opener>
+        <.typed_panic: 'X::Syntax::Comment::Embedded'>
+    }
     token comment:sym<#`(...)> {
-        '#`' <?opener> {}
-        [ <.quibble(self.slang_grammar('Quote'))> || <.typed_panic: 'X::Syntax::Comment::Embedded'> ]
+        '#`' <?opener>
+        #[ <.quibble(self.slang_grammar('Quote'))> || <.typed_panic: 'X::Syntax::Comment::Embedded'> ]
+        <.quibble(self.slang_grammar('Quote'))>
     }
 
+    #==========================
+    # leading declarator blocks
+    #==========================
+    # examples of valid ones:
+    #   #| single line
+    #   #|(
+    #      multi-
+    #      line
+    #     )
+    #==========================
+
+    # a multi-line leading declarator block:
+    # we panic when a non-opening bracket char follows the sym
+    # original first lines:
+    #    token comment:sym<#|(...)> {
+    #        '#|' <?opener> <attachment=.quibble(self.slang_grammar('Quote'))>
+    #
     token comment:sym<#|(...)> {
-        '#|' <?opener> <attachment=.quibble(self.slang_grammar('Quote'))>
+        '#|'
+        <?opener> <attachment=.quibble(self.slang_grammar('Quote'))>
         {
             unless $*POD_BLOCKS_SEEN{ self.from() } {
                 $*POD_BLOCKS_SEEN{ self.from() } := 1;
                 if $*DECLARATOR_DOCS eq '' {
                     $*DECLARATOR_DOCS := $<attachment><nibble>;
-                } else {
-                    $*DECLARATOR_DOCS := nqp::concat($*DECLARATOR_DOCS, nqp::concat("\n", $<attachment><nibble>));
+                }
+                else {
+                    $*DECLARATOR_DOCS := nqp::concat($*DECLARATOR_DOCS,
+                         nqp::concat("\n", $<attachment><nibble>));
                 }
             }
         }
     }
 
+    # a single-line leading declarator block:
     token comment:sym<#|> {
-        '#|' \h+ $<attachment>=[\N*]
+        '#|' \h $<attachment>=[\N*]
         {
             unless $*POD_BLOCKS_SEEN{ self.from() } {
                 $*POD_BLOCKS_SEEN{ self.from() } := 1;
                 if $*DECLARATOR_DOCS eq '' {
                     $*DECLARATOR_DOCS := $<attachment>;
-                } else {
-                    $*DECLARATOR_DOCS := nqp::concat($*DECLARATOR_DOCS, nqp::concat("\n", $<attachment>));
+                }
+                else {
+                    $*DECLARATOR_DOCS := nqp::concat($*DECLARATOR_DOCS,
+                        nqp::concat("\n", $<attachment>));
                 }
             }
         }
     }
 
+    #===========================
+    # trailing declarator blocks
+    #===========================
+    # examples of valid ones:
+    #   #= single line
+    #   #=(
+    #      multi-
+    #      line
+    #     )
+    #===========================
+
+    # a multi-line trailing declarator block:
+    # we would like to panic when a non-opening bracket char follows the sym
+    # TODO find a way to panic with a suitable exception class.
+    #      I believe it may have to be done inside the:
+    #        quibble(self.slang_grammar('Quote'))
+    #      chunk since no variations of the following seem to work:
+    #        [ <?opener> || <.typed_panic('X::Syntax::Pod::DeclaratorTrailing')> ]
+    # NOTE: the TODO remarks above also apply to the multi-line leading declarator blocks
     token comment:sym<#=(...)> {
         '#=' <?opener> <attachment=.quibble(self.slang_grammar('Quote'))>
         {
@@ -4710,6 +4831,7 @@ if $*COMPILING_CORE_SETTING {
         }
     }
 
+    # a single-line trailing declarator block:
     token comment:sym<#=> {
         '#=' \h+ $<attachment>=[\N*]
         {
@@ -4720,9 +4842,17 @@ if $*COMPILING_CORE_SETTING {
     method attach_leading_docs() {
         # TODO allow some limited text layout here
         if ~$*DOC ne '' {
-            my $cont  := Perl6::Pod::serialize_aos(
-                [Perl6::Pod::normalize_text(~$*DOC)]
-            ).compile_time_value;
+            my $cont;
+            if $*keep-decl {
+                $cont := Perl6::Pod::serialize_aos(
+                    [~$*DOC]
+                ).compile_time_value;
+            }
+            else {
+                $cont := Perl6::Pod::serialize_aos(
+                    [Perl6::Pod::normalize_text(~$*DOC)]
+                ).compile_time_value;
+            }
             my $block := $*W.add_constant(
                 'Pod::Block::Declarator', 'type_new',
                 :nocache, :leading([$cont]),
@@ -5061,7 +5191,6 @@ if $*COMPILING_CORE_SETTING {
         #     the first line of the first pod_textcontent
         #     becomes the term
         #     then combine the rest of the text
-        # TODO exchange **0..1 for modern syntax
         <pod_content=.pod_textcontent>**0..1
     }
 
@@ -5128,7 +5257,6 @@ if $*COMPILING_CORE_SETTING {
             [\h*\n|\h+]
         ]
         # TODO [defn, term], [first text, line numbered-alias]
-        # TODO exchange **0..1 for modern syntax
         <pod_content=.pod_textcontent>**0..1
     }
 
@@ -5172,7 +5300,6 @@ if $*COMPILING_CORE_SETTING {
         [ <!before \h* '=' \w> <pod_line> ]*
     }
 
-    # TODO exchange **1 for modern syntax
     token pod_line { <pod_string>**1 [ <pod_newline> | $ ] }
 
     token pod_newline {

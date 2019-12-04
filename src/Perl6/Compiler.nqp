@@ -31,7 +31,7 @@ class Perl6::Compiler is HLL::Compiler {
             $!language_version
         }
         else {
-            $!language_version := self.config<language-version>
+            $!language_version := %*COMPILING<%?OPTIONS><language_version> || self.config<language-version>
         }
     }
     method language_modifier() {
@@ -174,7 +174,8 @@ Note that only boolean single-letter options may be bundled.
 The following environment variables are respected:
 
   PERL6LIB    Modify the module search path
-  PERL6_HOME  Override the path of the Perl6 runtime files
+  RAKUDO_HOME Override the path of the Raku runtime files
+  PERL6_HOME  Override the path of the Raku runtime files
   NQP_HOME    Override the path of the NQP runtime files
 
 ♥); # end of usage statement

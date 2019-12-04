@@ -2,12 +2,15 @@ class Perl6::Metamodel::SubsetHOW
     does Perl6::Metamodel::Naming
     does Perl6::Metamodel::Documenting
     does Perl6::Metamodel::Stashing
+    does Perl6::Metamodel::LanguageRevision
 {
     # The subset type or nominal type that we refine.
     has $!refinee;
 
     # The block implementing the refinement.
     has $!refinement;
+
+    has $!pre-e-behavior;
 
     my $archetypes := Perl6::Metamodel::Archetypes.new( :nominalizable(1) );
     method archetypes() {
@@ -21,12 +24,14 @@ class Perl6::Metamodel::SubsetHOW
     method BUILD(:$refinee, :$refinement) {
         $!refinee := $refinee;
         $!refinement := $refinement;
+        $!pre-e-behavior := self.lang-rev-before('e');
     }
 
     method new_type(:$name = '<anon>', :$refinee!, :$refinement!) {
         my $metasubset := self.new(:refinee($refinee), :refinement($refinement));
         my $type := nqp::settypehll(nqp::newtype($metasubset, 'Uninstantiable'), 'perl6');
         $metasubset.set_name($type, $name);
+        $metasubset.set_language_version($metasubset);
         nqp::settypecheckmode($type, 2);
         self.add_stash($type)
     }
@@ -77,14 +82,19 @@ class Perl6::Metamodel::SubsetHOW
 
     # Do check when we're on LHS of smartmatch (e.g. Even ~~ Int).
     method type_check($obj, $checkee) {
-        nqp::hllboolfor(nqp::istrue($checkee.HOW =:= self) ||
-            nqp::istype($!refinee, $checkee), "perl6")
+        nqp::hllboolfor(
+            ($!pre-e-behavior && nqp::istrue($checkee.HOW =:= self))
+                || nqp::istype($!refinee, $checkee),
+            "perl6"
+        )
     }
 
     # Here we check the value itself (when on RHS on smartmatch).
     method accepts_type($obj, $checkee) {
         nqp::hllboolfor(
             nqp::istype($checkee, $!refinee) &&
-            nqp::istrue($!refinement.ACCEPTS($checkee)), "perl6")
+            nqp::istrue($!refinement.ACCEPTS($checkee)),
+            "perl6"
+        )
     }
 }
